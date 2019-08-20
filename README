@@ -1,0 +1,45 @@
+A simple static library for `automatic' memory management in C, as well as a basic object model, and a pseudo type-safe array accessor abstraction over memory and FILE* streams (as well as user-defined implementations).
+
+Basic usage:
+
+MANAGED({
+	void* ptr = Smalloc(1000);
+	
+	//...
+	if(foo) MANAGED_BREAK; //cleanly exit the managed block
+	//...
+
+	//No free required!
+});
+
+MANAGED_RETURNABLE(int, {
+
+	void* ptr = Smalloc(1000);
+
+	//...
+	if(foo) MANAGED_RETURN(0); //cleanly return from the function inside a managed block
+	//...
+	
+});
+
+void bar(S_LEXENV, int arg0, ...)
+{
+	void* ptr = Smalloc(1000); //Added to callers MANAGED environment.
+}
+
+void baz(S_LEXENV_NAMED(caller), int arg)
+{
+	MANAGED({
+		Smalloc(1000); //Added to our environment.
+		bar(caller, 1, "hello"); //Added to caller's environment.
+	});
+}
+
+int foo()
+{
+	MANAGED({
+		bar(S_THIS, 2, "hello", "world");
+	}); //foo's ptr is free()d here
+}
+
+For more advanced usage see src/test/main.c, include/store.h and include/store/*.h
