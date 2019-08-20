@@ -5,7 +5,7 @@ clean:
 	rm -f *.a
 
 store: clean
-	gcc -c src/*.c -g -Wall -Iinclude/ -std=gnu11 -D__STORE_IMPLEMENTATION
+	gcc -c src/*.c -g -Wall -pedantic -Iinclude/ -std=gnu11 -D__STORE_IMPLEMENTATION
 	ar rc lib$@.a *.o
 	ranlib lib$@.a
 	rm -f *.o

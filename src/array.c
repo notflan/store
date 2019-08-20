@@ -7,6 +7,49 @@
 
 #include <store/array_impl.h>
 
+static void _ar_custom_destructor(object* this)
+{
+	if(!this->state) return;
+
+	array_t state = this->state;
+
+	if(state->destructor)
+		state->destructor(state);
+
+	free(this->state);
+	this->state = NULL;
+}
+
+static void _ar_custom_constructor(object* this)
+{
+	array_t state = this->state;
+
+	if(state->constructor)
+		state->constructor(state);
+}
+
+array_t _ar_create(S_LEXENV, struct array proto, int extra, int init0)
+{
+	array_t mem = malloc(sizeof(struct array)+extra);
+
+	if(init0)
+		memset(mem->data,0, extra);
+
+	memcpy(mem, &proto, sizeof(struct array));
+
+	object obj = OBJ_PROTO;
+
+	obj.state = mem;
+	obj.destructor = &_ar_custom_destructor;
+	obj.constructor = &_ar_custom_constructor;
+
+
+	object *new = Snew_obj(obj);
+	mem->base = new;
+
+	return new->state;
+}
+
 static void* _ar_memory_get(struct array* this, long i)
 {
 	if(i< 0|| i>= this->size) return NULL;
@@ -33,6 +76,10 @@ static int _ar_memory_dump(const array_t this, void* buffer, size_t bufsize, siz
 
 static void _ar_memory_destructor(object* this)
 {
+	array_t state = this->state;
+
+	if(state->destructor) state->destructor(state);
+
 	free(this->state);
 	this->state=NULL;
 }
@@ -57,7 +104,10 @@ array_t ar_create_memory(S_LEXENV, size_t size, size_t count, int init0)
 	obj.state= mem;
 	obj.destructor = &_ar_memory_destructor;
 
-	return Snew_obj(obj)->state;
+
+	object* new =  Snew_obj(obj);
+	mem->base = new;
+	return new->state;
 }
 
 array_t ar_create_memory_from(S_LEXENV, const void* from, size_t element_size, size_t count)
@@ -104,6 +154,8 @@ static void _ar_file_destructor(object* _this)
 {
 	array_t this = _this->state;
 
+	if(this->destructor) this->destructor(this);
+
 	if(this->tl_state!=NULL)
 		free(this->tl_state);
 	if(this->data[0])
@@ -135,9 +187,12 @@ array_t ar_create_file(S_LEXENV, FILE* from, size_t element_size, int owns_strea
 	object obj = OBJ_PROTO;
 
 	obj.state = mem;
-	obj.destructor = &_ar_file_destructor;	
+	obj.destructor = &_ar_file_destructor;
 
-	return Snew_obj(obj)->state;
+
+	object* new = Snew_obj(obj);
+	mem->base = new;
+	return new->state;
 }
 
 ///Generic accessor functions
@@ -224,3 +279,6 @@ int ar_ndump(const array_t from, void* buffer, size_t bufsize, size_t offset, si
 		return 1;
 	}
 }
+
+
+const struct array ARRAY_PROTO = {0};
