@@ -18,6 +18,8 @@ struct array {
 	void *tl_state; //(optional) Second state variable.
 	void* state;	//(optional) First state variable.
 
+	void (*fill)(array_t this, const void* obj); //(optional) fill this array with obj
+
 	void (*constructor)(array_t this); //(optional) custom constructor for this array.
 	void (*destructor)(array_t this); //(optional) custom destructor for this array. (Do not call free(this) here, that is handled elsewhere)
 

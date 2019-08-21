@@ -84,6 +84,18 @@ static void _ar_memory_destructor(object* this)
 	this->state=NULL;
 }
 
+static void _ar_memory_fill(array_t this, const void* obj)
+{
+	if(this->element == 1)
+		memset(this->data, *((unsigned char*)obj), this->full_size); // memset if size is single byte
+	else {
+		for(register int i=0;i<this->size;i++)
+		{
+			memcpy(this->data+(i*this->element), obj, this->element);
+		}
+	}
+}
+
 array_t ar_create_memory(S_LEXENV, size_t size, size_t count, int init0)
 {
 	array_t mem = malloc(sizeof(struct array)+(size*count));
@@ -98,6 +110,7 @@ array_t ar_create_memory(S_LEXENV, size_t size, size_t count, int init0)
 	mem->get = &_ar_memory_get;
 	mem->set = &_ar_memory_set;
 	mem->dump = &_ar_memory_dump;
+	mem->fill = &_ar_memory_fill;
 
 	object obj = OBJ_PROTO;
 	
@@ -167,6 +180,34 @@ static void _ar_file_destructor(object* _this)
 	free(this);
 }
 
+void _ar_file_fill(array_t this,const void* obj)
+{
+	FILE* file = this->state;
+	fseek(file,0,SEEK_SET);
+	for(register int i=0;i<this->size;i++)
+	{
+		fwrite(obj, this->element, 0, file);
+	}
+}
+
+int _ar_file_dump(const array_t this, void* buffer, size_t bufsize, size_t offset, size_t count)
+{
+	if(offset+count > this->size) return 0;
+
+	FILE* file=  this->state;
+
+	fseek(file,offset*this->element,SEEK_SET);
+
+	if(this->element*count > bufsize)
+	{
+		fread(buffer,1,bufsize,file);
+		return 0;
+	}
+	else
+		fread(buffer, this->element, count, file);
+	return 1;
+}
+
 array_t ar_create_file(S_LEXENV, FILE* from, size_t element_size, int owns_stream)
 {
 	array_t mem = malloc(sizeof(struct array)+1);
@@ -180,9 +221,11 @@ array_t ar_create_file(S_LEXENV, FILE* from, size_t element_size, int owns_strea
 	mem->element = element_size;
 	mem->full_size = filesize(from);
 	mem->size = mem->full_size/element_size;
+	mem->dump = _ar_file_dump;
 
 	mem->get = &_ar_file_get;
 	mem->set = &_ar_file_set;
+	mem->fill = &_ar_file_fill;
 
 	object obj = OBJ_PROTO;
 
@@ -277,6 +320,16 @@ int ar_ndump(const array_t from, void* buffer, size_t bufsize, size_t offset, si
 			buf+= from->element;
 		}
 		return 1;
+	}
+}
+
+void ar_fill(const array_t from, const void* value)
+{
+	if(from->fill)
+		from->fill(from, value);
+	else {
+		for(register int i=0;i<ar_size(from);i++)
+			ar_set(from, i, value);
 	}
 }
 
